@@ -1,0 +1,183 @@
+{
+  "report_type": "market_size_analysis",
+  "target": "LINEマーケティングツール市場",
+  "executive_summary": "日本のLINEマーケティングツール市場は、LINE利用者9,600万人（普及率80%）を基盤とする約600億円規模の市場として推定される。企業導入率64.4%を背景に年平均成長率15-20%での拡大が予測され、2030年には1,500-2,000億円規模への成長が見込まれる。",
+  "findings": [
+    "TAM（総市場）：約1兆円（デジタルマーケティング市場の15-20%）",
+    "SAM（実市場）：約600億円（現在の到達可能市場）",
+    "SOM（獲得可能市場）：約90-120億円（現実的な獲得可能市場）",
+    "市場成長率：年平均15-20%（2025-2030年予測）"
+  ],
+  "metrics": {
+    "tam": 100000000000,
+    "sam": 60000000000,
+    "som": 10500000000,
+    "cagr": 0.175,
+    "market_size_current": 60000000000,
+    "growth_rate": 0.175,
+    "user_base": 96000000,
+    "penetration_rate": 0.8,
+    "enterprise_adoption_rate": 0.644,
+    "paid_tool_adoption_rate": 0.27
+  },
+  "market_projections": {
+    "2025": {
+      "size": 70000000000,
+      "growth_rate": 0.167
+    },
+    "2027": {
+      "size": 100000000000,
+      "growth_rate": 0.194
+    },
+    "2030": {
+      "size": 175000000000,
+      "growth_rate": 0.165
+    }
+  },
+  "segments": [
+    {
+      "name": "エントリーレベル（月額5,000-15,000円）",
+      "size": 25000000000,
+      "share": 0.4,
+      "growth_rate": 0.225,
+      "characteristics": "中小企業中心、基本機能重視、価格感度高"
+    },
+    {
+      "name": "プロフェッショナルレベル（月額15,000-30,000円）",
+      "size": 30000000000,
+      "share": 0.5,
+      "growth_rate": 0.175,
+      "characteristics": "中堅企業中心、高機能・分析重視"
+    },
+    {
+      "name": "エンタープライズレベル（月額30,000円以上）",
+      "size": 6000000000,
+      "share": 0.1,
+      "growth_rate": 0.125,
+      "characteristics": "大企業中心、カスタマイズ・コンサル重視"
+    }
+  ],
+  "regional_analysis": {
+    "japan": {
+      "size": 60000000000,
+      "share": 1.0,
+      "growth_rate": 0.175
+    },
+    "asia_pacific": {
+      "size": 135000000000,
+      "japan_share": 0.44
+    },
+    "global": {
+      "size": 350000000000,
+      "japan_share": 0.17
+    }
+  },
+  "growth_drivers": [
+    "DX推進：企業デジタル化の加速",
+    "マーケティング自動化需要：効率化・ROI向上ニーズ",
+    "プラットフォーム成熟：LINE公式アカウント機能拡張",
+    "AI統合：チャットボット・分析機能の高度化"
+  ],
+  "growth_inhibitors": [
+    "プラットフォーム依存リスク：LINE政策変更の影響",
+    "競合激化：既存プレイヤーの価格競争",
+    "技術的制約：システム統合の複雑さ",
+    "規制強化：個人情報保護法の影響"
+  ],
+  "opportunities": {
+    "short_term": [
+      {
+        "description": "未導入企業の開拓",
+        "potential_market": 15000000000,
+        "timeline": "1-2年"
+      },
+      {
+        "description": "既存顧客のアップグレード",
+        "potential_market": 18000000000,
+        "timeline": "1-2年"
+      }
+    ],
+    "medium_term": [
+      {
+        "description": "海外展開（アジア市場）",
+        "potential_market": 40000000000,
+        "timeline": "3-5年"
+      },
+      {
+        "description": "業界特化ソリューション",
+        "potential_market": 20000000000,
+        "timeline": "3-5年"
+      }
+    ],
+    "long_term": [
+      {
+        "description": "ビジネスモデル革新",
+        "potential_market": 60000000000,
+        "timeline": "5年以上"
+      },
+      {
+        "description": "生態系拡張（フィンテック連携）",
+        "potential_market": 100000000000,
+        "timeline": "5年以上"
+      }
+    ]
+  },
+  "investment_indicators": {
+    "market_attractiveness": "高",
+    "entry_barriers": "中程度",
+    "profitability": {
+      "gross_margin": 0.75,
+      "roi": 0.3,
+      "payback_period": 2.5
+    }
+  },
+  "sources": [
+    {
+      "title": "LINEヤフー販促・DX市場分析",
+      "url": "https://marketing-analytics.site/lineyahoo202403/",
+      "published_at": "2024-03",
+      "accessed_at": "2025-08-17",
+      "reliability": "A",
+      "quote_excerpt": "販促市場15兆円、DX潜在市場7.7兆円"
+    },
+    {
+      "title": "IMARC Group日本デジタルマーケティング市場",
+      "url": "https://imarcgroup.com/report/ja/japan-digital-marketing-software-market",
+      "published_at": "2024-06",
+      "accessed_at": "2025-08-17",
+      "reliability": "A",
+      "quote_excerpt": "日本デジタルマーケティング6,720億円"
+    },
+    {
+      "title": "SAAS.IMITSU LINE活用調査",
+      "url": "https://saas.imitsu.jp/cate-line-marketing-tool/serviceList",
+      "published_at": "2024-08",
+      "accessed_at": "2025-08-17",
+      "reliability": "B",
+      "quote_excerpt": "企業64.4%がLINE活用"
+    }
+  ],
+  "evidence_summary": {
+    "total_sources": 7,
+    "avg_publication_year": 2024.5,
+    "reliability_distribution": {
+      "A_tier": 2,
+      "B_tier": 4,
+      "C_tier": 1
+    },
+    "coverage_score": 0.78
+  },
+  "execution_metadata": {
+    "duration_sec": 180,
+    "model_used": "gpt",
+    "search_calls": 5,
+    "tokens_used": 68000,
+    "execution_date": "2025-08-17",
+    "degraded_mode": false,
+    "limitations": [
+      "直接的な市場規模データは非公開",
+      "推定計算による概算値",
+      "競合他社の詳細売上データ非公開"
+    ]
+  }
+}

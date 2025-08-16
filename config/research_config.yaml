@@ -1,0 +1,173 @@
+# 事業構築リサーチ自動化AIエージェント 設定ファイル v1.1
+
+# 基本設定
+system:
+  name: "事業構築リサーチ自動化AIエージェント"
+  version: "1.1.0"
+  max_execution_time: 300  # 秒（5分）
+  default_language: "ja"
+
+# コスト・予算管理
+cost:
+  max_total_tokens: 120000          # 1ジョブ上限
+  max_search_calls: 8               # 既定→超過時は縮退
+  stop_on_cost_jpy: 300             # コスト上限で打ち切り
+  retry_on_failure: 2               # 失敗時のリトライ回数
+
+# モデル選択ポリシー
+model_routing:
+  rules:
+    - if: "task=='market_research' and expected_tokens>6000"
+      use: "claude"                 # 長文要約
+    - if: "task in ['competitor_analysis','ad_strategy_analysis']"
+      use: "gpt"                    # 構造化・表・計算
+    - if: "task=='trend_analysis' and need_speed==true"
+      use: "gemini"                 # 高速要約
+    - if: "task=='user_voice_analysis'"
+      use: "claude"                 # 感情分析・テキスト理解
+    - if: "task=='integrated_research'"
+      use: "claude"                 # 統合・総合判断
+  default: "claude"                 # デフォルト
+
+# 検索設定（並列最適化）
+search:
+  parallel_requests: 3              # 第1段階の並列検索数
+  secondary_searches: 2             # 第2段階の補完検索数
+  timeout_per_search: 30            # 秒
+  retry_count: 2
+  cache_ttl_minutes: 10080          # 7日
+  
+  # ドメイン管理
+  domain_whitelist: 
+    - "go.jp"                       # 政府系
+    - "lg.jp"                       # 自治体
+    - "statista.com"                # 統計
+    - "ir.company"                  # IR情報
+    - "nikkei.com"                  # 日経
+    - "diamond.jp"                  # ダイヤモンド
+    - "toyokeizai.net"              # 東洋経済
+    - "reuters.com"                 # ロイター
+    - "bloomberg.co.jp"             # ブルームバーグ
+  
+  domain_blacklist:
+    - "content-farm.example"        # コンテンツファーム例
+    - "spam-site.example"           # スパムサイト例
+    
+  # 信頼度スコア基準
+  reliability_scoring:
+    A_tier: ["go.jp", "lg.jp", "company.ir", "listed-company-sites"]
+    B_tier: ["nikkei.com", "diamond.jp", "toyokeizai.net", "major-media"]
+    C_tier: ["blog", "social-media", "user-generated-content"]
+
+# 出力設定
+output:
+  base_directory: "Flow"
+  confirmed_directory: "Stock/projects"
+  file_encoding: "utf-8"
+  date_format: "%Y-%m-%d"
+  
+  # 機械可読二重化
+  emit_json: true                   # MDとJSONを併産
+  json_schema_version: "v1"
+  
+  # エビデンス管理
+  evidence_table: true              # 末尾の根拠表を強制
+  max_quote_length: 25              # 引用抜粋の最大語数
+  source_tracking: true             # ソース追跡を有効化
+
+# 品質基準（拡張）
+quality:
+  min_sources: 5
+  max_sources: 10
+  min_content_length: 2000          # 文字数
+  max_content_length: 4000          # 文字数
+  min_actions: 3
+  max_actions: 5
+  
+  # 新規追加
+  min_reliability_score: 0.6        # 信頼度の最低スコア
+  max_avg_source_age_months: 12     # ソースの平均新しさ（月）
+  min_evidence_coverage: 0.8        # 主張のエビデンス網羅率
+
+# リサーチタイプ別設定（拡張）
+research_types:
+  business_idea_research:
+    searches: 6
+    template: "business_idea_research_template.md"
+    time_limit: 240
+    preferred_model: "claude"
+    
+  market_research:
+    searches: 5
+    template: "market_research_template.md"
+    time_limit: 180
+    preferred_model: "claude"
+    
+  market_size_analysis:
+    searches: 5
+    template: "market_size_analysis_template.md"
+    time_limit: 180
+    preferred_model: "gpt"
+    
+  competitor_analysis:
+    searches: 6
+    template: "competitor_analysis_template.md"
+    time_limit: 180
+    preferred_model: "gpt"
+    
+  user_voice_analysis:
+    searches: 7
+    template: "user_voice_analysis_template.md"
+    time_limit: 240
+    preferred_model: "claude"
+    
+  partner_research:
+    searches: 5
+    template: "partner_research_template.md"
+    time_limit: 180
+    preferred_model: "claude"
+    
+  regional_market_research:
+    searches: 6
+    template: "regional_market_research_template.md"
+    time_limit: 240
+    preferred_model: "claude"
+    
+  trend_analysis:
+    searches: 5
+    template: "trend_analysis_template.md"
+    time_limit: 180
+    preferred_model: "gemini"
+    
+  ad_strategy_analysis:
+    searches: 7
+    template: "ad_strategy_analysis_template.md"
+    time_limit: 240
+    preferred_model: "gpt"
+    
+  integrated_research:
+    searches: 12
+    template: "integrated_research_template.md"
+    time_limit: 300
+    preferred_model: "claude"
+
+# 縮退運転設定
+fallback:
+  enable_degraded_mode: true
+  offline_knowledge_only: true      # 検索失敗時はオフライン知識のみ
+  show_limitations: true            # 制約事項の表示
+  todo_unfulfilled: true            # 未完了事項のTODO化
+
+# 法務・コンプライアンス
+compliance:
+  max_quote_words: 25               # 引用の最大語数
+  require_attribution: true        # 出典の必須表記
+  respect_robots_txt: true          # robots.txtの遵守
+  rate_limiting: true               # レート制限の適用
+
+# 監査・ログ
+audit:
+  log_all_searches: true            # 全検索のログ記録
+  track_model_usage: true           # モデル使用量の追跡
+  record_execution_metrics: true    # 実行メトリクスの記録
+  enable_quality_scoring: true      # 品質スコアリング

@@ -1,0 +1,55 @@
+{
+  "report_type": "market_research",
+  "target": "string",
+  "executive_summary": "string",
+  "findings": ["string"],
+  "metrics": {
+    "tam": "number|null",
+    "sam": "number|null", 
+    "som": "number|null",
+    "cagr": "number|null",
+    "market_size_current": "number|null",
+    "growth_rate": "number|null"
+  },
+  "players": [
+    {
+      "name": "string",
+      "share": "number|null",
+      "revenue": "number|null",
+      "strength": "string"
+    }
+  ],
+  "trends": ["string"],
+  "opportunities": ["string"],
+  "risks": ["string"],
+  "actions": ["string"],
+  "sources": [
+    {
+      "title": "string",
+      "url": "string",
+      "published_at": "string",
+      "accessed_at": "string",
+      "reliability": "A|B|C",
+      "quote_excerpt": "string"
+    }
+  ],
+  "evidence_summary": {
+    "total_sources": 0,
+    "avg_publication_year": 0,
+    "reliability_distribution": {
+      "A_tier": 0,
+      "B_tier": 0,
+      "C_tier": 0
+    },
+    "coverage_score": 0.0
+  },
+  "execution_metadata": {
+    "duration_sec": 0,
+    "model_used": "string",
+    "search_calls": 0,
+    "tokens_used": 0,
+    "execution_date": "string",
+    "degraded_mode": false,
+    "limitations": ["string"]
+  }
+}
