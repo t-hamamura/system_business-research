@@ -179,3 +179,43 @@ audit:
   track_model_usage: true           # モデル使用量の追跡
   record_execution_metrics: true    # 実行メトリクスの記録
   enable_quality_scoring: true      # 品質スコアリング
+
+# v2.0 新機能設定
+security:
+  safe_filename_conversion: true    # 安全なファイル名変換
+  timestamp_versioning: true       # タイムスタンプ版管理
+  max_filename_length: 80          # ファイル名最大長
+
+logging:
+  enabled: true                    # 実行ログ機能
+  max_log_entries: 10             # 保持ログ数
+  include_traceback: true         # エラートレースバック
+  auto_cleanup_old_logs: true     # 古いログ自動削除
+  quality_threshold: 60           # 品質警告閾値
+  cost_alert_threshold: 500       # コスト警告閾値（円）
+
+duplicate_prevention:
+  enabled: true                   # 重複実行防止
+  cache_hours: 24                # キャッシュ有効時間
+  similarity_threshold: 0.8       # 類似判定閾値
+  auto_cleanup_days: 7           # キャッシュ自動削除期間
+  max_cache_size_mb: 100         # 最大キャッシュサイズ
+  ignore_user_patterns:          # 重複チェック無視パターン
+    - "強制"
+    - "新しく"
+    - "再実行"
+
+quality_validation:
+  enabled: true                  # 品質検証機能
+  auto_validate: true           # 自動検証
+  min_passing_score: 60         # 合格最低点
+  save_validation_report: true  # 検証レポート保存
+  strict_mode: false           # 厳格モード
+  auto_retry_on_fail: false    # 不合格時自動再試行
+
+schema:
+  version: "2.0"               # スキーマバージョン
+  evidence_required: true      # エビデンス必須
+  min_sources_required: 5     # 最低ソース数
+  credibility_distribution:   # 信頼度分布要件
+    min_a_tier_ratio: 0.2    # A級ソース最低割合

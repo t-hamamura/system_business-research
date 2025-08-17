@@ -1,0 +1,348 @@
+# 実行ログ機能ルール（v2.0: 統計・監査対応）
+
+## 概要
+すべての調査実行時に詳細なログを記録し、実行統計、使用リソース、エラー情報を管理する。
+
+## 実行ログ機能
+```python
+import json
+import os
+from datetime import datetime
+import traceback
+import hashlib
+
+def init_execution_log(research_type, target, model="claude"):
+    """
+    実行開始時のログ初期化
+    """
+    return {
+        "execution_id": datetime.now().strftime("%Y%m%d_%H%M%S"),
+        "research_type": research_type,
+        "target": target,
+        "model": model,
+        "start_time": datetime.now().isoformat(),
+        "duration": 0,
+        "status": "running",
+        "search_count": 0,
+        "tokens": 0,
+        "cost": 0,
+        "sources": 0,
+        "files": [],
+        "credibility": {"A": 0, "B": 0, "C": 0},
+        "quality_score": 0,
+        "errors": [],
+        "warnings": []
+    }
+
+def log_search_call(log_data, query, results_count=0, tokens_used=0):
+    """
+    検索実行ログ
+    """
+    log_data["search_count"] += 1
+    log_data["tokens"] += tokens_used
+    log_data["sources"] += results_count
+    
+    # コスト概算（Claude基準）
+    cost_per_token = 0.0075 / 1000  # 円/トークン
+    log_data["cost"] = log_data["tokens"] * cost_per_token
+    
+    return log_data
+
+def log_credibility_source(log_data, tier):
+    """
+    信頼度別ソース数をカウント
+    """
+    if tier in ["A", "B", "C"]:
+        log_data["credibility"][tier] += 1
+    return log_data
+
+def log_error(log_data, error_message, error_type="general"):
+    """
+    エラーログ記録
+    """
+    error_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "type": error_type,
+        "message": str(error_message),
+        "traceback": traceback.format_exc() if error_type == "exception" else None
+    }
+    log_data["errors"].append(error_entry)
+    log_data["status"] = "error"
+    return log_data
+
+def log_warning(log_data, warning_message, warning_type="general"):
+    """
+    警告ログ記録
+    """
+    warning_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "type": warning_type,
+        "message": str(warning_message)
+    }
+    log_data["warnings"].append(warning_entry)
+    return log_data
+
+def log_output_file(log_data, file_path, file_type="markdown"):
+    """
+    出力ファイルログ
+    """
+    file_info = {
+        "path": file_path,
+        "type": file_type,
+        "size": os.path.getsize(file_path) if os.path.exists(file_path) else 0,
+        "created_at": datetime.now().isoformat()
+    }
+    log_data["files"].append(file_info)
+    return log_data
+
+def calculate_quality_score(log_data, content_length=0):
+    """
+    品質スコア計算
+    """
+    score = 100
+    
+    # ソース数チェック（最低5件）
+    if log_data["sources"] < 5:
+        score -= (5 - log_data["sources"]) * 10
+    
+    # 信頼度分布チェック
+    total_sources = sum(log_data["credibility"].values())
+    if total_sources > 0:
+        a_ratio = log_data["credibility"]["A"] / total_sources
+        if a_ratio < 0.3:  # A級ソースが30%未満
+            score -= 15
+    
+    # コンテンツ長チェック
+    if content_length < 2000:
+        score -= 20
+    
+    # エラー・警告ペナルティ
+    score -= len(log_data["errors"]) * 15
+    score -= len(log_data["warnings"]) * 5
+    
+    log_data["quality_score"] = max(0, score)
+    return log_data
+
+def finish_execution_log(log_data, content_length=0):
+    """
+    実行完了時のログ確定
+    """
+    end_time = datetime.now()
+    start_time = datetime.fromisoformat(log_data["start_time"])
+    log_data["duration"] = int((end_time - start_time).total_seconds())
+    
+    if log_data["status"] == "running":
+        log_data["status"] = "completed"
+    
+    # 品質スコア計算
+    log_data = calculate_quality_score(log_data, content_length)
+    
+    return log_data
+
+def save_execution_log(folder_path, log_data):
+    """
+    実行ログを保存
+    """
+    try:
+        # フォルダ作成
+        os.makedirs(folder_path, exist_ok=True)
+        
+        log_file = os.path.join(folder_path, "_execution_log.json")
+        
+        # 既存ログ読み込み
+        logs = []
+        if os.path.exists(log_file):
+            try:
+                with open(log_file, 'r', encoding='utf-8') as f:
+                    logs = json.load(f)
+            except json.JSONDecodeError:
+                logs = []  # 破損ファイルは初期化
+        
+        # 新規ログを追加
+        logs.append(log_data)
+        
+        # 最新10件のみ保持
+        logs = logs[-10:]
+        
+        # 保存
+        with open(log_file, 'w', encoding='utf-8') as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
+        
+        # サマリーログも保存
+        save_execution_summary(folder_path, log_data)
+        
+        return {
+            "status": "success",
+            "message": f"実行ログを保存しました: {log_file}",
+            "log_entry": log_data
+        }
+    
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"ログ保存エラー: {str(e)}",
+            "error": str(e)
+        }
+
+def save_execution_summary(folder_path, log_data):
+    """
+    実行サマリーの保存（最新実行の概要）
+    """
+    summary_file = os.path.join(folder_path, "_latest_execution.json")
+    
+    summary = {
+        "execution_id": log_data["execution_id"],
+        "timestamp": log_data["start_time"],
+        "research_type": log_data["research_type"],
+        "target": log_data["target"],
+        "status": log_data["status"],
+        "duration_sec": log_data["duration"],
+        "quality_score": log_data["quality_score"],
+        "source_count": log_data["sources"],
+        "cost_jpy": round(log_data["cost"], 2),
+        "has_errors": len(log_data["errors"]) > 0,
+        "has_warnings": len(log_data["warnings"]) > 0,
+        "output_files": [f["path"] for f in log_data["files"]]
+    }
+    
+    try:
+        with open(summary_file, 'w', encoding='utf-8') as f:
+            json.dump(summary, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass  # サマリー保存失敗は無視
+
+def get_execution_statistics(folder_path):
+    """
+    実行統計の取得
+    """
+    log_file = os.path.join(folder_path, "_execution_log.json")
+    
+    if not os.path.exists(log_file):
+        return {
+            "total_executions": 0,
+            "success_rate": 0,
+            "avg_duration": 0,
+            "avg_quality_score": 0,
+            "total_cost": 0
+        }
+    
+    try:
+        with open(log_file, 'r', encoding='utf-8') as f:
+            logs = json.load(f)
+        
+        if not logs:
+            return {"total_executions": 0}
+        
+        # 統計計算
+        total = len(logs)
+        successful = len([l for l in logs if l["status"] == "completed"])
+        
+        return {
+            "total_executions": total,
+            "success_rate": successful / total if total > 0 else 0,
+            "avg_duration": sum(l["duration"] for l in logs) / total,
+            "avg_quality_score": sum(l["quality_score"] for l in logs) / total,
+            "total_cost": sum(l["cost"] for l in logs),
+            "avg_sources": sum(l["sources"] for l in logs) / total,
+            "error_rate": len([l for l in logs if len(l["errors"]) > 0]) / total
+        }
+    
+    except Exception:
+        return {"total_executions": 0, "error": "統計取得失敗"}
+```
+
+## 使用方法
+
+### 1. 調査開始時
+```python
+# 調査開始
+log_data = init_execution_log("market_research", "電動歯ブラシ市場", "claude")
+```
+
+### 2. 検索実行時
+```python
+# 検索実行後
+log_data = log_search_call(log_data, "電動歯ブラシ 市場規模", results_count=5, tokens_used=1500)
+```
+
+### 3. 信頼度評価時
+```python
+# 各ソースの信頼度評価後
+log_data = log_credibility_source(log_data, "A")  # A級ソース
+```
+
+### 4. エラー・警告発生時
+```python
+# エラー発生時
+log_data = log_error(log_data, "検索APIエラー", "api_error")
+
+# 警告発生時
+log_data = log_warning(log_data, "古い情報源が含まれています", "data_quality")
+```
+
+### 5. ファイル出力時
+```python
+# ファイル出力後
+log_data = log_output_file(log_data, "Flow/20250127/market_research.md", "markdown")
+```
+
+### 6. 調査完了時
+```python
+# 調査完了
+log_data = finish_execution_log(log_data, content_length=3500)
+result = save_execution_log("Flow/20250127/", log_data)
+```
+
+## 実行報告への追加情報
+
+各調査完了時の報告に以下の情報を追加：
+
+```
+📊 実行統計:
+- 実行ID: 20250127_143025
+- 所要時間: 245秒
+- 検索回数: 5回
+- 情報源数: 12件
+- 品質スコア: 85/100
+- 推定コスト: ¥15.30
+
+🏆 品質評価:
+- A級ソース: 4件 (33%)
+- B級ソース: 6件 (50%)
+- C級ソース: 2件 (17%)
+- エラー: 0件
+- 警告: 1件（古いデータあり）
+
+💾 出力ファイル:
+- market_research.md (3.2KB)
+- market_research.json (1.8KB)
+- _execution_log.json (更新)
+```
+
+## ログ分析・監査機能
+
+### 1. 実行統計の確認
+```python
+stats = get_execution_statistics("Stock/talklabel/market-research/")
+print(f"成功率: {stats['success_rate']:.1%}")
+print(f"平均品質スコア: {stats['avg_quality_score']:.1f}")
+print(f"累計コスト: ¥{stats['total_cost']:.2f}")
+```
+
+### 2. 品質傾向の監視
+- 品質スコア60未満の場合は自動警告
+- エラー発生率が20%を超える場合はアラート
+- コスト超過時の自動停止
+
+## 設定
+
+config/research_config.yamlに以下を追加：
+```yaml
+logging:
+  enabled: true
+  max_log_entries: 10
+  include_traceback: true
+  auto_cleanup_old_logs: true
+  quality_threshold: 60
+  cost_alert_threshold: 500  # 円
+```

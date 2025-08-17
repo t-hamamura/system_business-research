@@ -1,0 +1,518 @@
+# レポート品質自動検証機能ルール（v2.0: 包括的品質管理）
+
+## 概要
+生成されたレポートの品質を自動検証し、不足項目の検出、改善提案、品質スコアの算出を行う。
+
+## 品質検証機能
+```python
+import re
+import json
+import os
+from datetime import datetime
+
+def validate_report_quality(content, report_type, metadata=None):
+    """
+    レポート品質を包括的に検証
+    """
+    validation_results = {
+        "passed": True,
+        "score": 100,
+        "grade": "A",
+        "issues": [],
+        "warnings": [],
+        "suggestions": [],
+        "metrics": {},
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    # 1. 基本構造チェック
+    validation_results = check_basic_structure(content, report_type, validation_results)
+    
+    # 2. コンテンツ品質チェック
+    validation_results = check_content_quality(content, validation_results)
+    
+    # 3. エビデンス品質チェック
+    validation_results = check_evidence_quality(content, validation_results)
+    
+    # 4. テンプレート完成度チェック
+    validation_results = check_template_completion(content, validation_results)
+    
+    # 5. 実行メタデータチェック
+    if metadata:
+        validation_results = check_execution_metadata(metadata, validation_results)
+    
+    # 6. 最終スコア計算とグレード判定
+    validation_results = calculate_final_grade(validation_results)
+    
+    return validation_results
+
+def check_basic_structure(content, report_type, results):
+    """
+    基本構造の検証
+    """
+    # 必須セクションの定義
+    required_sections = {
+        "market_research": [
+            "エグゼクティブサマリー", "主要ファインディング", "市場概況", 
+            "推奨アクション", "エビデンス一覧"
+        ],
+        "competitor_analysis": [
+            "エグゼクティブサマリー", "主要ファインディング", "競合環境概況", 
+            "主要競合分析", "推奨戦略", "エビデンス一覧"
+        ],
+        "user_voice_analysis": [
+            "エグゼクティブサマリー", "センチメント分析", "主要な評価ポイント", 
+            "改善提案", "エビデンス一覧"
+        ],
+        "trend_analysis": [
+            "エグゼクティブサマリー", "主要トレンド", "影響分析", 
+            "将来予測", "推奨アクション", "エビデンス一覧"
+        ],
+        "partner_research": [
+            "エグゼクティブサマリー", "パートナー候補分析", "評価サマリー", 
+            "推奨パートナー", "エビデンス一覧"
+        ]
+    }
+    
+    sections = required_sections.get(report_type, [])
+    
+    for section in sections:
+        if section not in content:
+            results["issues"].append(f"必須セクション「{section}」が見つかりません")
+            results["score"] -= 10
+            results["passed"] = False
+        else:
+            # セクションが空でないかチェック
+            section_pattern = f"{section}.*?(?=##|$)"
+            section_match = re.search(section_pattern, content, re.DOTALL)
+            if section_match:
+                section_content = section_match.group(0)
+                # セクション内容が短すぎる場合
+                if len(section_content.strip()) < 100:
+                    results["warnings"].append(f"セクション「{section}」の内容が短すぎる可能性があります")
+                    results["score"] -= 3
+    
+    # 基本メトリクス記録
+    results["metrics"]["total_sections"] = len(sections)
+    results["metrics"]["found_sections"] = len([s for s in sections if s in content])
+    
+    return results
+
+def check_content_quality(content, results):
+    """
+    コンテンツ品質の検証
+    """
+    # 1. 最小文字数チェック
+    content_length = len(content)
+    results["metrics"]["content_length"] = content_length
+    
+    if content_length < 2000:
+        results["issues"].append(f"レポートが短すぎます（{content_length}文字）。最低2000文字必要です。")
+        results["score"] -= 20
+        results["passed"] = False
+    elif content_length < 3000:
+        results["warnings"].append("レポートがやや短めです。より詳細な分析を推奨します。")
+        results["score"] -= 5
+    
+    # 2. 最大文字数チェック
+    if content_length > 8000:
+        results["warnings"].append("レポートが長すぎる可能性があります。要点を整理することを推奨します。")
+        results["score"] -= 3
+    
+    # 3. 段落構造チェック
+    paragraphs = content.split('\n\n')
+    short_paragraphs = [p for p in paragraphs if len(p.strip()) < 50 and p.strip()]
+    
+    if len(short_paragraphs) > len(paragraphs) * 0.3:
+        results["warnings"].append("短い段落が多すぎます。内容をより詳しく記述してください。")
+        results["score"] -= 5
+    
+    # 4. 数値データの存在チェック
+    number_pattern = r'\d+[.,]?\d*[%万円兆千百億]'
+    numbers = re.findall(number_pattern, content)
+    results["metrics"]["numeric_data_count"] = len(numbers)
+    
+    if len(numbers) < 3:
+        results["warnings"].append("具体的な数値データが不足しています。定量的な情報を追加してください。")
+        results["score"] -= 8
+    
+    # 5. 専門用語・業界用語の適切性
+    jargon_patterns = [
+        r'[A-Z]{2,5}',  # 略語
+        r'(?:マーケット|ニーズ|ソリューション|プラットフォーム)',  # ビジネス用語
+    ]
+    
+    jargon_count = 0
+    for pattern in jargon_patterns:
+        jargon_count += len(re.findall(pattern, content))
+    
+    results["metrics"]["business_terms_count"] = jargon_count
+    
+    return results
+
+def check_evidence_quality(content, results):
+    """
+    エビデンス品質の検証
+    """
+    # 1. エビデンステーブルの存在チェック
+    if "エビデンス一覧" not in content:
+        results["issues"].append("エビデンス一覧セクションが見つかりません")
+        results["score"] -= 15
+        results["passed"] = False
+        return results
+    
+    # 2. テーブル行数をカウント
+    table_rows = content.count("\n|") - content.count("\n|---|")  # ヘッダー区切り線除外
+    results["metrics"]["evidence_table_rows"] = table_rows
+    
+    if table_rows < 5:  # 最低5ソース
+        results["issues"].append(f"エビデンステーブルのソース数が不足しています（{table_rows}件）。最低5件必要です。")
+        results["score"] -= 15
+        results["passed"] = False
+    elif table_rows < 8:
+        results["warnings"].append("エビデンスソース数がやや少なめです。より多くの情報源を推奨します。")
+        results["score"] -= 5
+    
+    # 3. URL形式チェック
+    url_pattern = r'https?://[^\s\|)]+(?:\.[^\s\|)]+)+'
+    urls = re.findall(url_pattern, content)
+    results["metrics"]["url_count"] = len(urls)
+    
+    if len(urls) < table_rows * 0.8:  # 80%以上のソースにURLが必要
+        results["warnings"].append("有効なURLが不足している可能性があります")
+        results["score"] -= 8
+    
+    # 4. 信頼度ティアの分布チェック
+    tier_a = content.count("|A|") + content.count("| A |")
+    tier_b = content.count("|B|") + content.count("| B |")
+    tier_c = content.count("|C|") + content.count("| C |")
+    
+    results["metrics"]["credibility_tiers"] = {"A": tier_a, "B": tier_b, "C": tier_c}
+    
+    total_tiers = tier_a + tier_b + tier_c
+    if total_tiers > 0:
+        a_ratio = tier_a / total_tiers
+        if a_ratio < 0.2:  # A級ソースが20%未満
+            results["warnings"].append("高信頼度（A級）ソースの割合が低すぎます")
+            results["score"] -= 10
+        elif a_ratio > 0.8:  # A級ソースが80%超
+            results["warnings"].append("信頼度分布が偏っている可能性があります")
+            results["score"] -= 3
+    
+    # 5. 引用抜粋の品質チェック
+    quote_pattern = r'\|[^|]{10,200}\|'  # 10-200文字の引用
+    quotes = re.findall(quote_pattern, content)
+    results["metrics"]["quote_count"] = len(quotes)
+    
+    if len(quotes) < table_rows * 0.5:
+        results["warnings"].append("引用抜粋が不足している可能性があります")
+        results["score"] -= 5
+    
+    return results
+
+def check_template_completion(content, results):
+    """
+    テンプレート完成度チェック
+    """
+    # 1. 未置換テンプレート変数チェック
+    placeholder_patterns = [
+        r'\{\{[^}]+\}\}',  # {{variable}}
+        r'\[.*?\]',        # [placeholder]
+        r'TODO',           # TODO markers
+        r'N/A',            # Not Available
+        r'分析中',          # 分析中
+        r'調査中',          # 調査中
+        r'要確認',          # 要確認
+        r'未定',           # 未定
+    ]
+    
+    placeholders_found = []
+    for pattern in placeholder_patterns:
+        matches = re.findall(pattern, content)
+        placeholders_found.extend(matches)
+    
+    results["metrics"]["placeholders_found"] = len(placeholders_found)
+    
+    if placeholders_found:
+        results["issues"].append(f"未完成の箇所があります: {placeholders_found[:3]}")
+        results["score"] -= 15
+        results["passed"] = False
+    
+    # 2. 空セクションチェック
+    empty_patterns = [
+        r'##[^#\n]*\n\s*\n##',      # 空のセクション（次のセクションまで）
+        r'##[^#\n]*\n\s*$',         # 文末の空セクション
+        r'：\s*\n\s*\n',            # コロンの後が空
+        r'。\s*\n\s*\n##',          # 短い説明のみのセクション
+    ]
+    
+    empty_sections = 0
+    for pattern in empty_patterns:
+        empty_sections += len(re.findall(pattern, content, re.MULTILINE))
+    
+    results["metrics"]["empty_sections"] = empty_sections
+    
+    if empty_sections > 0:
+        results["warnings"].append(f"空または内容の薄いセクションが{empty_sections}件見つかりました")
+        results["score"] -= empty_sections * 3
+    
+    return results
+
+def check_execution_metadata(metadata, results):
+    """
+    実行メタデータの検証
+    """
+    if not metadata:
+        return results
+    
+    # 1. 実行時間チェック
+    duration = metadata.get("duration_sec", 0)
+    results["metrics"]["execution_duration"] = duration
+    
+    if duration < 60:
+        results["warnings"].append("実行時間が短すぎる可能性があります。十分な調査が行われていない可能性があります。")
+        results["score"] -= 10
+    elif duration > 600:  # 10分超
+        results["warnings"].append("実行時間が長すぎます。効率性を改善する余地があります。")
+        results["score"] -= 3
+    
+    # 2. 検索回数チェック
+    search_count = metadata.get("search_count", 0)
+    results["metrics"]["search_calls"] = search_count
+    
+    if search_count < 3:
+        results["warnings"].append("検索回数が少なすぎます。より多角的な情報収集を推奨します。")
+        results["score"] -= 8
+    
+    # 3. ソース数チェック
+    source_count = metadata.get("source_count", 0)
+    if source_count < 5:
+        results["issues"].append("情報源数が不足しています。最低5件必要です。")
+        results["score"] -= 12
+        results["passed"] = False
+    
+    # 4. エラー・警告チェック
+    error_count = len(metadata.get("errors", []))
+    warning_count = len(metadata.get("warnings", []))
+    
+    if error_count > 0:
+        results["warnings"].append(f"実行中に{error_count}件のエラーが発生しました")
+        results["score"] -= error_count * 8
+    
+    if warning_count > 2:
+        results["warnings"].append(f"実行中に{warning_count}件の警告が発生しました")
+        results["score"] -= warning_count * 2
+    
+    return results
+
+def calculate_final_grade(results):
+    """
+    最終グレード計算
+    """
+    score = max(0, results["score"])
+    
+    # グレード判定
+    if score >= 90:
+        grade = "A"
+        grade_description = "優秀"
+    elif score >= 80:
+        grade = "B"
+        grade_description = "良好"
+    elif score >= 70:
+        grade = "C"
+        grade_description = "標準"
+    elif score >= 60:
+        grade = "D"
+        grade_description = "要改善"
+    else:
+        grade = "F"
+        grade_description = "不合格"
+        results["passed"] = False
+    
+    results["score"] = score
+    results["grade"] = grade
+    results["grade_description"] = grade_description
+    
+    # 改善提案生成
+    results["suggestions"] = generate_improvement_suggestions(results)
+    
+    return results
+
+def generate_improvement_suggestions(results):
+    """
+    改善提案を生成
+    """
+    suggestions = []
+    
+    # 構造的問題の提案
+    if any("必須セクション" in issue for issue in results["issues"]):
+        suggestions.append("不足している必須セクションを追加してください。特に「エビデンス一覧」は品質向上に重要です。")
+    
+    # コンテンツ量の提案
+    content_length = results["metrics"].get("content_length", 0)
+    if content_length < 2000:
+        suggestions.append("より詳細な分析を追加してください。特に「市場動向」「競合比較」セクションを充実させることを推奨します。")
+    
+    # エビデンスの提案
+    evidence_rows = results["metrics"].get("evidence_table_rows", 0)
+    if evidence_rows < 5:
+        suggestions.append("web_searchを再実行してより多くの情報源を取得し、エビデンステーブルを充実させてください。")
+    
+    # 数値データの提案
+    numeric_count = results["metrics"].get("numeric_data_count", 0)
+    if numeric_count < 3:
+        suggestions.append("市場規模、成長率、シェアなどの具体的な数値データを追加してください。")
+    
+    # 信頼度分布の提案
+    tiers = results["metrics"].get("credibility_tiers", {})
+    total_tiers = sum(tiers.values())
+    if total_tiers > 0 and tiers.get("A", 0) / total_tiers < 0.2:
+        suggestions.append("より信頼度の高い情報源（政府統計、業界レポート、上場企業IR等）を追加してください。")
+    
+    # 未完成箇所の提案
+    if results["metrics"].get("placeholders_found", 0) > 0:
+        suggestions.append("未置換のテンプレート変数やTODOマーカーを解決してください。必要に応じて追加検索を実行してください。")
+    
+    return suggestions
+
+def save_validation_report(folder_path, validation_results, original_content):
+    """
+    検証レポートの保存
+    """
+    try:
+        os.makedirs(folder_path, exist_ok=True)
+        
+        # 検証結果をJSONで保存
+        validation_file = os.path.join(folder_path, "_quality_validation.json")
+        with open(validation_file, 'w', encoding='utf-8') as f:
+            json.dump(validation_results, f, ensure_ascii=False, indent=2)
+        
+        # 人間可読なレポートも生成
+        readable_report = generate_readable_validation_report(validation_results)
+        report_file = os.path.join(folder_path, "_quality_report.md")
+        with open(report_file, 'w', encoding='utf-8') as f:
+            f.write(readable_report)
+        
+        return {
+            "status": "success",
+            "validation_file": validation_file,
+            "report_file": report_file
+        }
+    
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"検証レポート保存エラー: {str(e)}"
+        }
+
+def generate_readable_validation_report(results):
+    """
+    人間可読な検証レポート生成
+    """
+    report = f"""# レポート品質検証結果
+
+## 総合評価
+- **グレード**: {results['grade']} ({results['grade_description']})
+- **スコア**: {results['score']}/100
+- **合格判定**: {'✅ 合格' if results['passed'] else '❌ 不合格'}
+- **検証日時**: {results['timestamp']}
+
+## 品質メトリクス
+"""
+    
+    for key, value in results['metrics'].items():
+        report += f"- {key}: {value}\n"
+    
+    if results['issues']:
+        report += "\n## ❌ 重要な問題\n"
+        for issue in results['issues']:
+            report += f"- {issue}\n"
+    
+    if results['warnings']:
+        report += "\n## ⚠️ 警告・改善点\n"
+        for warning in results['warnings']:
+            report += f"- {warning}\n"
+    
+    if results['suggestions']:
+        report += "\n## 💡 改善提案\n"
+        for suggestion in results['suggestions']:
+            report += f"- {suggestion}\n"
+    
+    report += f"""
+## 品質基準
+- **A (90-100)**: 優秀 - 商用レベルの高品質レポート
+- **B (80-89)**: 良好 - 軽微な改善で商用利用可能  
+- **C (70-79)**: 標準 - 基本要件は満たしているが改善余地あり
+- **D (60-69)**: 要改善 - 大幅な修正が必要
+- **F (0-59)**: 不合格 - 再作成を推奨
+"""
+    
+    return report
+```
+
+## 使用方法
+
+### 1. レポート生成直後の自動検証
+```python
+# レポート生成完了後
+validation_results = validate_report_quality(
+    content=report_content,
+    report_type="market_research", 
+    metadata=execution_log_data
+)
+
+# 結果を表示
+print(f"品質スコア: {validation_results['score']}/100 (グレード: {validation_results['grade']})")
+
+if not validation_results['passed']:
+    print("❌ 品質基準を満たしていません。以下の問題を修正してください：")
+    for issue in validation_results['issues']:
+        print(f"  - {issue}")
+```
+
+### 2. 検証レポートの保存
+```python
+# 検証結果を保存
+save_result = save_validation_report(
+    folder_path="Flow/20250127/market-research/",
+    validation_results=validation_results,
+    original_content=report_content
+)
+```
+
+### 3. 品質改善の自動提案
+```python
+# 改善提案の表示
+if validation_results['suggestions']:
+    print("💡 品質向上のための提案:")
+    for suggestion in validation_results['suggestions']:
+        print(f"  - {suggestion}")
+```
+
+## 品質スコア詳細
+
+### スコア構成
+- **基本構造 (40点)**: 必須セクションの完備
+- **コンテンツ品質 (25点)**: 文字数、段落構造、数値データ
+- **エビデンス品質 (25点)**: ソース数、信頼度、引用品質
+- **完成度 (10点)**: テンプレート完成、空セクション除去
+
+### 減点項目
+- 必須セクション不足: -10点/セクション
+- 文字数不足: -20点（2000文字未満）
+- エビデンス不足: -15点（5ソース未満）
+- 未完成箇所: -15点
+- テンプレート変数残存: -15点
+
+## 設定オプション
+
+config/research_config.yamlに追加：
+```yaml
+quality_validation:
+  enabled: true
+  auto_validate: true           # 自動検証の有効化
+  min_passing_score: 60         # 合格最低点
+  save_validation_report: true  # 検証レポート保存
+  strict_mode: false           # 厳格モード（Aグレード要求）
+  auto_retry_on_fail: true     # 不合格時の自動再試行
+```

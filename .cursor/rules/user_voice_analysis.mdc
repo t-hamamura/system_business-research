@@ -1,4 +1,37 @@
-# ユーザーボイス分析ルール
+# ユーザーボイス分析ルール（v2.0: 安全機能強化版）
+
+## 安全なファイル名変換関数
+```python
+import re
+import unicodedata
+
+def safe_filename(text, max_length=80):
+    """
+    ファイルシステムで安全な名前に変換
+    """
+    # NFKC正規化（全角→半角変換含む）
+    text = unicodedata.normalize('NFKC', text)
+    
+    # 英数字、ひらがな、カタカナ、漢字、ハイフン、アンダースコアのみ許可
+    safe_text = re.sub(r'[^\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\-]', '_', text)
+    
+    # 連続するアンダースコアを1つに
+    safe_text = re.sub(r'_+', '_', safe_text)
+    
+    # 先頭末尾のアンダースコア削除
+    safe_text = safe_text.strip('_')
+    
+    # 長さ制限
+    if len(safe_text) > max_length:
+        safe_text = safe_text[:max_length]
+    
+    # 空文字列の場合はデフォルト値
+    return safe_text or "unknown"
+
+# 使用例: 
+# target_name = "ChatGPT/競合分析？（2025年版）"
+# safe_name = safe_filename(target_name)  # "ChatGPT_競合分析_2025年版"
+```
 
 ## トリガー条件
 「ユーザー調査」「ユーザーボイス」「口コミ調査」「レビュー分析」のいずれかが入力された場合

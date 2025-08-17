@@ -1,0 +1,398 @@
+# 重複実行防止機能ルール（v2.0: キャッシュ・効率化対応）
+
+## 概要
+同一または類似の調査の重複実行を防止し、リソースの無駄遣いを防ぐ。ハッシュ値による重複判定とインテリジェントキャッシュを実装。
+
+## 重複実行防止機能
+```python
+import hashlib
+import json
+import os
+from datetime import datetime, timedelta
+import difflib
+
+def normalize_query(query):
+    """
+    クエリの正規化（類似判定用）
+    """
+    # 小文字化
+    query = query.lower()
+    
+    # 不要な文字除去
+    import re
+    query = re.sub(r'[？?！!。、,\s]+', ' ', query)
+    
+    # 同義語統一
+    synonyms = {
+        '市場調査': 'マーケット調査',
+        '競合分析': '競合調査',
+        'ユーザーボイス': 'ユーザー調査',
+        'トレンド調査': 'トレンド分析'
+    }
+    
+    for original, normalized in synonyms.items():
+        query = query.replace(original, normalized)
+    
+    return query.strip()
+
+def generate_query_hash(research_type, target_query):
+    """
+    クエリのハッシュ生成
+    """
+    # 正規化されたクエリを作成
+    normalized = normalize_query(target_query)
+    
+    # 調査タイプとクエリを結合
+    combined = f"{research_type}:{normalized}"
+    
+    # ハッシュ生成
+    return hashlib.md5(combined.encode()).hexdigest()
+
+def check_duplicate_execution(research_type, query, cache_hours=24):
+    """
+    重複実行をチェック
+    """
+    # クエリのハッシュ生成
+    query_hash = generate_query_hash(research_type, query)
+    
+    # キャッシュファイルパス
+    cache_dir = "Flow/.cache"
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_file = os.path.join(cache_dir, f"cache_{query_hash}.json")
+    
+    # 既存キャッシュをチェック
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cache_data = json.load(f)
+            
+            cached_time = datetime.fromisoformat(cache_data["timestamp"])
+            time_diff = datetime.now() - cached_time
+            
+            if time_diff < timedelta(hours=cache_hours):
+                # 類似度チェック
+                similarity = calculate_query_similarity(query, cache_data["original_query"])
+                
+                return {
+                    "is_duplicate": True,
+                    "cache_age_hours": time_diff.total_seconds() / 3600,
+                    "similarity": similarity,
+                    "message": f"⚠️ {cache_hours}時間以内に類似の調査を実行済みです",
+                    "previous_result": cache_data.get("result_path"),
+                    "executed_at": cache_data["timestamp"],
+                    "original_query": cache_data["original_query"],
+                    "cache_file": cache_file
+                }
+        
+        except (json.JSONDecodeError, KeyError, ValueError):
+            # 破損キャッシュは削除
+            try:
+                os.remove(cache_file)
+            except:
+                pass
+    
+    # 類似クエリの検索
+    similar_cache = find_similar_cache(research_type, query, cache_hours)
+    if similar_cache:
+        return similar_cache
+    
+    # キャッシュ記録関数を返す
+    def record_cache(result_path, execution_log=None):
+        cache_data = {
+            "query_hash": query_hash,
+            "research_type": research_type,
+            "original_query": query,
+            "normalized_query": normalize_query(query),
+            "timestamp": datetime.now().isoformat(),
+            "result_path": result_path,
+            "execution_log": execution_log,
+            "cache_version": "2.0"
+        }
+        
+        try:
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Warning: キャッシュ記録に失敗: {e}")
+    
+    return {
+        "is_duplicate": False,
+        "record_function": record_cache,
+        "query_hash": query_hash
+    }
+
+def calculate_query_similarity(query1, query2):
+    """
+    クエリの類似度計算（0.0-1.0）
+    """
+    norm1 = normalize_query(query1)
+    norm2 = normalize_query(query2)
+    
+    # 完全一致
+    if norm1 == norm2:
+        return 1.0
+    
+    # 文字列類似度
+    similarity = difflib.SequenceMatcher(None, norm1, norm2).ratio()
+    
+    # キーワード重複度
+    words1 = set(norm1.split())
+    words2 = set(norm2.split())
+    
+    if words1 and words2:
+        keyword_overlap = len(words1 & words2) / len(words1 | words2)
+        # 文字列類似度とキーワード重複度の加重平均
+        similarity = 0.6 * similarity + 0.4 * keyword_overlap
+    
+    return similarity
+
+def find_similar_cache(research_type, query, cache_hours=24, similarity_threshold=0.8):
+    """
+    類似のキャッシュを検索
+    """
+    cache_dir = "Flow/.cache"
+    if not os.path.exists(cache_dir):
+        return None
+    
+    cutoff_time = datetime.now() - timedelta(hours=cache_hours)
+    best_match = None
+    best_similarity = 0
+    
+    try:
+        for filename in os.listdir(cache_dir):
+            if not filename.startswith("cache_") or not filename.endswith(".json"):
+                continue
+            
+            cache_file = os.path.join(cache_dir, filename)
+            
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cache_data = json.load(f)
+                
+                # 調査タイプチェック
+                if cache_data.get("research_type") != research_type:
+                    continue
+                
+                # 時間チェック
+                cached_time = datetime.fromisoformat(cache_data["timestamp"])
+                if cached_time < cutoff_time:
+                    continue
+                
+                # 類似度計算
+                similarity = calculate_query_similarity(query, cache_data["original_query"])
+                
+                if similarity > best_similarity and similarity >= similarity_threshold:
+                    best_similarity = similarity
+                    best_match = {
+                        "is_duplicate": True,
+                        "cache_age_hours": (datetime.now() - cached_time).total_seconds() / 3600,
+                        "similarity": similarity,
+                        "message": f"⚠️ 類似の調査が{cache_hours}時間以内に実行済みです（類似度: {similarity:.1%}）",
+                        "previous_result": cache_data.get("result_path"),
+                        "executed_at": cache_data["timestamp"],
+                        "original_query": cache_data["original_query"],
+                        "cache_file": cache_file
+                    }
+            
+            except (json.JSONDecodeError, KeyError, ValueError):
+                continue
+    
+    except OSError:
+        pass
+    
+    return best_match
+
+def cleanup_old_cache(max_age_days=7):
+    """
+    古いキャッシュファイルのクリーンアップ
+    """
+    cache_dir = "Flow/.cache"
+    if not os.path.exists(cache_dir):
+        return {"cleaned": 0, "errors": 0}
+    
+    cutoff_time = datetime.now() - timedelta(days=max_age_days)
+    cleaned_count = 0
+    error_count = 0
+    
+    try:
+        for filename in os.listdir(cache_dir):
+            if not filename.startswith("cache_") or not filename.endswith(".json"):
+                continue
+            
+            cache_file = os.path.join(cache_dir, filename)
+            
+            try:
+                # ファイルの最終更新時刻をチェック
+                file_time = datetime.fromtimestamp(os.path.getmtime(cache_file))
+                
+                if file_time < cutoff_time:
+                    os.remove(cache_file)
+                    cleaned_count += 1
+            
+            except Exception:
+                error_count += 1
+    
+    except OSError:
+        error_count += 1
+    
+    return {"cleaned": cleaned_count, "errors": error_count}
+
+def get_cache_statistics():
+    """
+    キャッシュ統計の取得
+    """
+    cache_dir = "Flow/.cache"
+    if not os.path.exists(cache_dir):
+        return {"total_cache": 0, "valid_cache": 0, "total_size_kb": 0}
+    
+    total_files = 0
+    valid_files = 0
+    total_size = 0
+    research_types = {}
+    
+    try:
+        for filename in os.listdir(cache_dir):
+            if not filename.startswith("cache_") or not filename.endswith(".json"):
+                continue
+            
+            cache_file = os.path.join(cache_dir, filename)
+            
+            try:
+                total_size += os.path.getsize(cache_file)
+                total_files += 1
+                
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cache_data = json.load(f)
+                
+                # 有効性チェック
+                if "research_type" in cache_data and "timestamp" in cache_data:
+                    valid_files += 1
+                    research_type = cache_data["research_type"]
+                    research_types[research_type] = research_types.get(research_type, 0) + 1
+            
+            except:
+                continue
+    
+    except OSError:
+        pass
+    
+    return {
+        "total_cache": total_files,
+        "valid_cache": valid_files,
+        "total_size_kb": round(total_size / 1024, 1),
+        "research_types": research_types
+    }
+
+def force_clear_cache():
+    """
+    全キャッシュの強制削除
+    """
+    cache_dir = "Flow/.cache"
+    if not os.path.exists(cache_dir):
+        return {"status": "success", "message": "キャッシュディレクトリが存在しません"}
+    
+    try:
+        import shutil
+        shutil.rmtree(cache_dir)
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        return {
+            "status": "success", 
+            "message": "全キャッシュを削除しました"
+        }
+    
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"キャッシュ削除エラー: {str(e)}"
+        }
+```
+
+## 使用方法
+
+### 1. 調査開始前のチェック
+```python
+# 重複チェック実行
+duplicate_check = check_duplicate_execution("market_research", "電動歯ブラシ市場調査")
+
+if duplicate_check["is_duplicate"]:
+    print(duplicate_check["message"])
+    print(f"前回実行: {duplicate_check['executed_at']}")
+    print(f"結果ファイル: {duplicate_check['previous_result']}")
+    
+    # ユーザーに継続確認
+    user_input = input("それでも新しく調査を実行しますか？ (y/N): ")
+    if user_input.lower() != 'y':
+        exit()
+```
+
+### 2. 調査完了後のキャッシュ記録
+```python
+# 調査完了後
+if not duplicate_check["is_duplicate"]:
+    duplicate_check["record_function"](
+        result_path="Stock/project/market-research/market_research_20250127_143025.md",
+        execution_log=execution_log_data
+    )
+```
+
+### 3. 定期的なクリーンアップ
+```python
+# 週1回のクリーンアップ
+cleanup_result = cleanup_old_cache(max_age_days=7)
+print(f"古いキャッシュ {cleanup_result['cleaned']} 件を削除しました")
+```
+
+## ユーザー操作コマンド
+
+### キャッシュ統計の確認
+```
+「キャッシュ状況を確認して」
+```
+
+### キャッシュの手動削除
+```
+「キャッシュをクリアして」
+「古いキャッシュを削除して」
+```
+
+### 重複チェックの無効化
+```
+「重複チェックを無視して実行して」
+「強制的に新しく調査して」
+```
+
+## 重複検出時のユーザーメッセージ
+
+```
+⚠️ 類似の調査が24時間以内に実行済みです
+
+📋 前回の調査情報:
+- 実行日時: 2025-01-27 12:30:25
+- 調査クエリ: 「電動歯ブラシ市場分析」
+- 類似度: 85%
+- 結果ファイル: Stock/dental-products/market-research/market_research_20250127_123025.md
+
+🔄 選択肢:
+1. 前回の結果を再利用する
+2. それでも新しく調査を実行する
+3. 前回の結果を確認してから判断する
+
+どちらを希望されますか？（1/2/3）
+```
+
+## 設定オプション
+
+config/research_config.yamlに追加：
+```yaml
+duplicate_prevention:
+  enabled: true
+  cache_hours: 24              # キャッシュ有効時間
+  similarity_threshold: 0.8    # 類似判定閾値
+  auto_cleanup_days: 7         # 自動クリーンアップ期間
+  max_cache_size_mb: 100       # 最大キャッシュサイズ
+  ignore_user_patterns:        # 重複チェック無視パターン
+    - "強制"
+    - "新しく"
+    - "再実行"
+```

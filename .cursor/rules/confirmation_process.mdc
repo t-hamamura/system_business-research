@@ -1,4 +1,120 @@
-# 確定反映処理ルール
+# 確定反映処理ルール（v2.0: タイムスタンプ版管理対応）
+
+## 安全なファイル名変換関数
+```python
+import re
+import unicodedata
+import os
+import shutil
+from datetime import datetime
+import json
+
+def safe_filename(text, max_length=80):
+    """
+    ファイルシステムで安全な名前に変換
+    """
+    # NFKC正規化（全角→半角変換含む）
+    text = unicodedata.normalize('NFKC', text)
+    
+    # 英数字、ひらがな、カタカナ、漢字、ハイフン、アンダースコアのみ許可
+    safe_text = re.sub(r'[^\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\-]', '_', text)
+    
+    # 連続するアンダースコアを1つに
+    safe_text = re.sub(r'_+', '_', safe_text)
+    
+    # 先頭末尾のアンダースコア削除
+    safe_text = safe_text.strip('_')
+    
+    # 長さ制限
+    if len(safe_text) > max_length:
+        safe_text = safe_text[:max_length]
+    
+    # 空文字列の場合はデフォルト値
+    return safe_text or "unknown"
+
+def safe_confirmation(flow_path, stock_path):
+    """
+    安全な確定反映（タイムスタンプ版管理）
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    moved_files = []
+    
+    try:
+        # ファイル移動（タイムスタンプ付き）
+        for file in os.listdir(flow_path):
+            if file.startswith("draft_"):
+                base_name = file.replace("draft_", "")
+                name, ext = os.path.splitext(base_name)
+                new_name = f"{name}_{timestamp}{ext}"
+                
+                src = os.path.join(flow_path, file)
+                dst = os.path.join(stock_path, new_name)
+                
+                # ディレクトリ作成
+                os.makedirs(stock_path, exist_ok=True)
+                
+                # ファイル移動
+                shutil.move(src, dst)
+                moved_files.append(new_name)
+                
+                # 最新版ポインタ更新
+                update_latest_pointer(stock_path, new_name)
+        
+        # Flow フォルダクリーンアップ
+        cleanup_empty_folders(flow_path)
+        
+        return {
+            "status": "success",
+            "message": f"✅ 確定完了: {stock_path} (タイムスタンプ: {timestamp})",
+            "files": moved_files,
+            "timestamp": timestamp
+        }
+    
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"❌ 確定反映エラー: {str(e)}",
+            "files": moved_files,
+            "error": str(e)
+        }
+
+def update_latest_pointer(folder, latest_file):
+    """最新版へのポインタを更新"""
+    pointer_file = os.path.join(folder, "_latest.json")
+    data = {
+        "latest": latest_file,
+        "updated_at": datetime.now().isoformat(),
+        "previous_versions": []
+    }
+    
+    # 既存の履歴を読み込み
+    if os.path.exists(pointer_file):
+        try:
+            with open(pointer_file, 'r', encoding='utf-8') as f:
+                old_data = json.load(f)
+                if "latest" in old_data:
+                    data["previous_versions"] = [old_data["latest"]] + old_data.get("previous_versions", [])[:9]  # 最大10履歴
+        except json.JSONDecodeError:
+            pass  # 破損ファイルは無視
+    
+    try:
+        with open(pointer_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Warning: 最新版ポインタの更新に失敗: {e}")
+
+def cleanup_empty_folders(folder_path):
+    """空フォルダのクリーンアップ"""
+    try:
+        if os.path.exists(folder_path) and not os.listdir(folder_path):
+            os.rmdir(folder_path)
+            # 親フォルダも空なら削除
+            parent = os.path.dirname(folder_path)
+            if parent != folder_path and os.path.exists(parent) and not os.listdir(parent):
+                os.rmdir(parent)
+    except OSError:
+        pass  # 削除できない場合は無視
+```
 
 ## トリガー条件
 「確定反映して」「確定版にして」「Stockに移動して」「確定保存して」のいずれかが入力された場合

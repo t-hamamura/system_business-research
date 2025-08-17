@@ -1,0 +1,256 @@
+{
+  "version": "2.0",
+  "schema_description": "事業リサーチシステム - 厳密化されたエビデンス管理スキーマ",
+  "last_updated": "2025-01-27",
+  "report_type": "string",
+  "target": "string",
+  "executive_summary": "string",
+  "findings": ["string"],
+  "evidence": {
+    "required": true,
+    "description": "必須エビデンスセクション - 全ての主張には対応するエビデンスが必要",
+    "items": [
+      {
+        "claim_id": {
+          "type": "string",
+          "description": "主張ID（例: CLAIM_001）",
+          "required": true
+        },
+        "source_title": {
+          "type": "string", 
+          "description": "情報源のタイトル",
+          "required": true,
+          "max_length": 200
+        },
+        "source_url": {
+          "type": "string",
+          "description": "情報源のURL",
+          "required": true,
+          "format": "uri"
+        },
+        "publisher": {
+          "type": "string",
+          "description": "発行者・発信者",
+          "required": true,
+          "max_length": 100
+        },
+        "published_date": {
+          "type": "string",
+          "description": "発行日",
+          "required": true,
+          "format": "YYYY-MM-DD"
+        },
+        "accessed_at": {
+          "type": "string",
+          "description": "アクセス日時",
+          "required": true,
+          "format": "YYYY-MM-DDTHH:mm:ssZ"
+        },
+        "excerpt": {
+          "type": "string",
+          "description": "引用抜粋（最大25語）",
+          "required": true,
+          "max_words": 25
+        },
+        "credibility": {
+          "tier": {
+            "type": "string",
+            "enum": ["A", "B", "C"],
+            "description": "信頼度ティア（A=最高、B=中、C=低）",
+            "required": true
+          },
+          "reason": {
+            "type": "string",
+            "description": "信頼度判定理由",
+            "required": true,
+            "max_length": 100
+          }
+        },
+        "verification_status": {
+          "type": "string",
+          "enum": ["verified", "unverified", "conflicting"],
+          "description": "検証状況",
+          "required": true
+        },
+        "data_points": {
+          "type": "array",
+          "description": "抽出されたデータポイント",
+          "items": {
+            "metric": "string",
+            "value": "string|number",
+            "unit": "string",
+            "confidence": "number (0.0-1.0)"
+          }
+        }
+      }
+    ],
+    "conflict_resolution": [
+      {
+        "conflicting_claims": {
+          "type": "array",
+          "description": "矛盾する主張IDのリスト",
+          "items": "string"
+        },
+        "resolution": {
+          "type": "string",
+          "description": "矛盾解決方法",
+          "required": true
+        },
+        "confidence": {
+          "type": "number",
+          "description": "解決の信頼度（0.0-1.0）",
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      }
+    ],
+    "evidence_summary": {
+      "total_sources": {
+        "type": "integer",
+        "minimum": 5,
+        "description": "最低5ソース必要"
+      },
+      "credibility_distribution": {
+        "A_tier": "integer",
+        "B_tier": "integer", 
+        "C_tier": "integer"
+      },
+      "coverage_completeness": {
+        "type": "number",
+        "description": "主張に対するエビデンス網羅率",
+        "minimum": 0.8,
+        "maximum": 1.0
+      },
+      "verification_rate": {
+        "type": "number",
+        "description": "検証済み情報の割合",
+        "minimum": 0.0,
+        "maximum": 1.0
+      }
+    }
+  },
+  "metrics": {
+    "tam": "number|null",
+    "sam": "number|null", 
+    "som": "number|null",
+    "cagr": "number|null",
+    "market_size_current": "number|null",
+    "growth_rate": "number|null"
+  },
+  "players": [
+    {
+      "name": "string",
+      "share": "number|null",
+      "revenue": "number|null",
+      "strength": "string",
+      "evidence_claim_id": {
+        "type": "string",
+        "description": "このプレイヤー情報を支持するエビデンスID"
+      }
+    }
+  ],
+  "trends": {
+    "type": "array",
+    "items": {
+      "trend": "string",
+      "evidence_claim_id": "string",
+      "confidence": "number (0.0-1.0)"
+    }
+  },
+  "opportunities": {
+    "type": "array",
+    "items": {
+      "opportunity": "string",
+      "evidence_claim_id": "string",
+      "priority": {
+        "type": "string",
+        "enum": ["high", "medium", "low"]
+      }
+    }
+  },
+  "risks": {
+    "type": "array", 
+    "items": {
+      "risk": "string",
+      "evidence_claim_id": "string",
+      "severity": {
+        "type": "string",
+        "enum": ["high", "medium", "low"]
+      }
+    }
+  },
+  "actions": {
+    "type": "array",
+    "items": {
+      "action": "string",
+      "evidence_claim_id": "string",
+      "timeline": "string",
+      "priority": {
+        "type": "string", 
+        "enum": ["immediate", "short_term", "medium_term", "long_term"]
+      }
+    }
+  },
+  "metadata": {
+    "execution_date": {
+      "type": "string",
+      "format": "YYYY-MM-DD",
+      "required": true
+    },
+    "duration_sec": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "model_used": {
+      "type": "string",
+      "required": true
+    },
+    "search_calls": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "source_count": {
+      "type": "integer",
+      "minimum": 5
+    },
+    "quality_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "品質スコア（60未満は要改善）"
+    },
+    "limitations": {
+      "type": "array",
+      "items": "string",
+      "description": "調査の制約事項"
+    },
+    "schema_version": {
+      "type": "string",
+      "default": "2.0"
+    },
+    "validation_status": {
+      "type": "object",
+      "properties": {
+        "passed": "boolean",
+        "score": "integer (0-100)",
+        "issues": "array",
+        "warnings": "array"
+      }
+    }
+  },
+  "validation_rules": {
+    "min_sources": 5,
+    "min_content_length": 2000,
+    "min_evidence_coverage": 0.8,
+    "required_credibility_mix": {
+      "A_tier_minimum": 2,
+      "verification_rate_minimum": 0.6
+    },
+    "forbidden_patterns": [
+      "{{.*}}",
+      "TODO",
+      "N/A",
+      "分析中"
+    ]
+  }
+}
