@@ -66,9 +66,9 @@ system_business-research/
 ├── examples/
 │   └── sample_market_research.md          # サンプルレポート
 ├── Flow/                                   # ドラフト作業領域
-│   └── YYYYMM/YYYY-MM-DD/[案件名]/       # 日付別フォルダ
-└── Stock/projects/                         # 確定版保存領域
-    └── [案件名]/research_results/         # 案件別確定版
+│   └── [案件名]/[調査タイプ]/            # 案件・調査タイプ別フォルダ
+└── Stock/                                  # 確定版保存領域
+    └── [案件名]/[調査タイプ]/            # 案件・調査タイプ別確定版
 ```
 
 ## 🛠️ セットアップ
@@ -100,7 +100,7 @@ system_business-research/
 **たったこれだけ！** 2-3分で詳細なレポートが生成されます。
 
 ### ステップ3: 結果を確認する
-- レポートは `Flow/202508/2025-08-17/電動歯ブラシ/` フォルダに自動保存
+- レポートは `Flow/電動歯ブラシ/market-research/` フォルダに自動保存
 - `draft_market_research.md` で読みやすいレポート
 - `draft_market_research.json` で機械可読データ
 
@@ -209,7 +209,7 @@ system_business-research/
 - ✅ 複数の調査を組み合わせて情報補完
 
 **❓ 「ファイルが見つからない」**
-- ✅ `Flow/YYYYMM/YYYY-MM-DD/` フォルダを確認
+- ✅ `Flow/[案件名]/[調査タイプ]/` フォルダを確認
 - ✅ 案件名が自動生成されているか確認
 - ✅ Cursor IDEでプロジェクトフォルダが正しく開かれているか確認
 

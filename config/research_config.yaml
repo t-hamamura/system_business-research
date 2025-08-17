@@ -62,7 +62,7 @@ search:
 # 出力設定
 output:
   base_directory: "Flow"
-  confirmed_directory: "Stock/projects"
+  confirmed_directory: "Stock"
   file_encoding: "utf-8"
   date_format: "%Y-%m-%d"
   
