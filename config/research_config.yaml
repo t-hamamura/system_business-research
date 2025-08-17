@@ -75,6 +75,14 @@ output:
   max_quote_length: 25              # 引用抜粋の最大語数
   source_tracking: true             # ソース追跡を有効化
 
+# 確定反映・Flowクリーンアップ設定
+confirmation:
+  auto_cleanup_flow: true           # Flow自動削除の有効化
+  safety_check: true                # 移動完了確認の実行
+  empty_folder_cleanup: true        # 空フォルダの自動削除
+  deletion_confirmation: true       # 削除前の最終確認
+  cleanup_log: true                 # クリーンアップログの記録
+
 # 品質基準（拡張）
 quality:
   min_sources: 5
